@@ -1,0 +1,386 @@
+// schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Tenancy ────────────────────────────────────────────────
+//
+// Family is the root tenant. Every top-level model carries familyId.
+// Row-level security is enforced at the DB layer — not just application layer.
+// UUIDs used throughout: prevents sequential enumeration, safe to expose in URLs.
+
+model Family {
+  id             String   @id @default(uuid())
+  // null = direct B2C family. populated = family belongs to a PaaS org customer.
+  // V2: create Organisation model, make non-nullable. See ADR-09.
+  organisationId String?
+  name           String
+  createdAt      DateTime @default(now())
+
+  members          User[]
+  goals            Goal[]
+  expenses         Expense[]
+  calendarAccounts CalendarAccount[]
+  insightSnapshots InsightSnapshot[]
+  taxProfile       TaxProfile?
+
+  @@index([organisationId])  // fast org-scoped queries when PaaS is activated
+  @@map("families")
+}
+
+model User {
+  id           String     @id @default(uuid())
+  familyId     String
+  email        String     @unique
+  passwordHash String
+  name         String
+  role         FamilyRole @default(MEMBER)
+  // Google OAuth refresh token — AES-256 encrypted at application layer.
+  // V2: migrate to AWS Secrets Manager, store only a secret reference here.
+  googleRefreshTokenEnc String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt  // FIX: track when user profile changes
+
+  family           Family            @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  goals            Goal[]            @relation("GoalOwner")
+  checkins         GoalCheckin[]
+  calendarAccounts CalendarAccount[]
+
+  @@index([familyId])  // FIX: always query users by familyId — index makes this fast
+  @@map("users")
+}
+
+enum FamilyRole {
+  ADMIN
+  MEMBER
+}
+
+// ─── Goals ──────────────────────────────────────────────────
+//
+// Goals are soft-deleted (archivedAt) — hard delete destroys check-in history.
+// requiresTimeBlock drives conflict detection in the insight engine.
+// V2: replace requiresTimeBlock with weeklyTimeCommitmentMinutes for richer insights.
+
+model Goal {
+  id                String       @id @default(uuid())
+  familyId          String
+  ownerId           String
+  title             String
+  category          GoalCategory
+  targetDate        DateTime?
+  requiresTimeBlock Boolean      @default(false)
+  notes             String?
+  archivedAt        DateTime?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt  // FIX: track goal edits
+
+  family   Family        @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  owner    User          @relation("GoalOwner", fields: [ownerId], references: [id])
+  checkins GoalCheckin[]
+  expenses Expense[]     @relation("GoalExpense")
+
+  @@index([familyId])
+  @@index([familyId, archivedAt])  // FIX: fast query for active goals per family
+  @@map("goals")
+}
+
+// GoalCheckin is an immutable record — never updated, only inserted.
+// One check-in per goal per week enforced via unique constraint.
+// weekStart is always the Monday of that week (normalised in application layer).
+model GoalCheckin {
+  id          String        @id @default(uuid())
+  goalId      String
+  userId      String
+  weekStart   DateTime      // FIX: Monday of the check-in week — normalised to 00:00:00 UTC
+  status      CheckinStatus
+  note        String?
+  checkedInAt DateTime      @default(now())
+
+  goal Goal @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id])
+
+  // FIX: one check-in per goal per week — prevents duplicate check-ins
+  @@unique([goalId, weekStart])
+  @@index([goalId])
+  @@map("goal_checkins")
+}
+
+enum GoalCategory {
+  PERSONAL_GROWTH
+  KIDS_DEVELOPMENT
+  FAMILY
+  HEALTH
+  FINANCIAL
+  OTHER
+}
+
+enum CheckinStatus {
+  ON_TRACK
+  OFF_TRACK
+  BLOCKED
+  COMPLETED
+}
+
+// ─── Finances ───────────────────────────────────────────────
+//
+// Expense holds current state. ExpenseEvent holds immutable history.
+// These two tables must never diverge. Expense is the source of truth.
+// On any write to Expense, an ExpenseEvent must be written in the same transaction.
+// updatedAt on Expense lets us detect stale cache without querying the event log.
+
+model Expense {
+  id           String          @id @default(uuid())
+  familyId     String
+  name         String
+  amount       Decimal         @db.Decimal(12, 2)  // FIX: Decimal over Float — avoids floating point rounding on money
+  currency     String          @default("GBP")
+  category     ExpenseCategory
+  recurrence   Recurrence
+  nextDueDate  DateTime?
+  linkedGoalId String?
+  source       ExpenseSource   @default(MANUAL)
+  isActive     Boolean         @default(true)      // FIX: soft delete — deactivate instead of deleting
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  family     Family         @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  linkedGoal Goal?          @relation("GoalExpense", fields: [linkedGoalId], references: [id])
+  events     ExpenseEvent[]
+
+  @@index([familyId])
+  @@index([familyId, isActive])        // FIX: fast query for active expenses
+  @@index([familyId, category])        // FIX: fast category aggregations for financial view
+  @@index([nextDueDate])               // FIX: fast query for upcoming renewals
+  @@map("expenses")
+}
+
+// Append-only audit log — NEVER update or delete rows in this table.
+// Every write to Expense must produce a corresponding ExpenseEvent in the same DB transaction.
+// payload stores full snapshot — enables point-in-time reconstruction without replaying diffs.
+// Source of truth conflict rule: if Expense and ExpenseEvent diverge, Expense wins.
+// The event log is for audit and history — not for rebuilding state.
+model ExpenseEvent {
+  id        String            @id @default(uuid())
+  expenseId String
+  eventType ExpenseEventType  // FIX: enum instead of free string — prevents invalid event types
+  payload   Json              // full Expense snapshot at time of event
+  createdAt DateTime          @default(now())
+
+  expense Expense @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+
+  @@index([expenseId])
+  @@index([createdAt])  // FIX: fast time-range queries on expense history
+  @@map("expense_events")
+}
+
+// FIX: typed enum for event types — prevents "CREATD" typo bugs
+enum ExpenseEventType {
+  CREATED
+  UPDATED
+  DEACTIVATED  // replaces DELETED — we soft delete expenses, not hard delete
+}
+
+enum ExpenseCategory {
+  KIDS_ACTIVITIES
+  PERSONAL_GROWTH
+  HOUSEHOLD
+  SAVINGS
+  ENTERTAINMENT
+  SUBSCRIPTIONS
+  INVESTMENT    // V2: dividends, broker fees — feeds into Kapitalerträge insights
+  PROPERTY      // V2: mortgage, maintenance, AfA — feeds into Werbungskosten insights
+  PENSION       // V2: Riester, Rürup, bAV contributions — feeds into pension insights
+  OTHER
+}
+
+enum Recurrence {
+  WEEKLY
+  MONTHLY
+  QUARTERLY
+  ANNUAL
+  ONE_OFF
+}
+
+enum ExpenseSource {
+  MANUAL
+  EXCEL_IMPORT
+}
+
+// ─── Calendar ───────────────────────────────────────────────
+//
+// CalendarAccount abstracts the provider — supports Google now, Outlook in V2.
+// CalendarEvent is a local read cache — synced every 15 minutes from Google Calendar API.
+// Google Calendar remains the source of truth in V1.
+// The @@unique constraint on [calendarAccountId, externalId] makes sync idempotent.
+
+model CalendarAccount {
+  id           String    @id @default(uuid())
+  userId       String
+  familyId     String
+  provider     String    @default("google")
+  // FIX: store the Google Calendar ID (e.g. primary, or a specific calendar)
+  // Allows users to connect a specific calendar rather than defaulting to primary
+  providerAccountId String?
+  lastSyncedAt DateTime?
+  // FIX: track sync failures — if syncFailureCount > 3, surface an insight to reconnect
+  syncFailureCount  Int       @default(0)
+  createdAt         DateTime  @default(now())
+
+  user   User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  family Family          @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  events CalendarEvent[]
+
+  @@index([familyId])
+  @@map("calendar_accounts")
+}
+
+// Local cache of Google Calendar events — synced every 15 minutes.
+// Never treat this as a source of truth — always re-sync if data seems stale.
+// FIX: added color and description fields — needed for visual calendar rendering
+// FIX: added deletedAt for soft-deleted events (when Google event is cancelled)
+model CalendarEvent {
+  id                String    @id @default(uuid())
+  calendarAccountId String
+  familyId          String    // FIX: denormalised for fast family-scoped calendar queries
+  externalId        String    // Google Calendar event ID
+  title             String
+  description       String?   // FIX: store description for context in conflict detection
+  startTime         DateTime
+  endTime           DateTime
+  isAllDay          Boolean   @default(false)
+  color             String?   // FIX: preserve Google Calendar event colour for UI
+  deletedAt         DateTime? // FIX: soft delete — when Google event is cancelled, mark here
+  syncedAt          DateTime  @default(now())
+
+  calendarAccount CalendarAccount @relation(fields: [calendarAccountId], references: [id], onDelete: Cascade)
+
+  @@unique([calendarAccountId, externalId])
+  @@index([familyId, startTime, endTime])  // FIX: fast date-range queries for calendar view
+  @@index([familyId, deletedAt])           // FIX: fast query for active events only
+  @@map("calendar_events")
+}
+
+// ─── Insights ───────────────────────────────────────────────
+//
+// Insights are pre-computed by the insight worker and stored as snapshots.
+// Reading insights is fast — no joins at render time.
+// dismissedAt: user has acknowledged and cleared this insight.
+// resolvedAt: the underlying condition is no longer true — insight is stale.
+// re-surfaces after 7 days if condition returns, even if previously dismissed.
+
+model InsightSnapshot {
+  id          String          @id @default(uuid())
+  familyId    String
+  ruleId      String          // e.g. "unblocked_commitments", "goal_neglect"
+  message     String
+  severity    InsightSeverity @default(INFO)
+  // FIX: metadata stores rule-specific context for rendering rich insight cards
+  // e.g. { goalId: "...", goalTitle: "Train for 5k", daysSinceCheckin: 24 }
+  metadata    Json?
+  generatedAt DateTime        @default(now())
+  dismissedAt DateTime?
+  // FIX: resolvedAt tracks when the condition that triggered this insight no longer applies
+  // Insight worker sets this when re-running rules and finding the condition resolved
+  resolvedAt  DateTime?
+
+  family Family @relation(fields: [familyId], references: [id], onDelete: Cascade)
+
+  // FIX: one active insight per rule per family — prevents duplicate insights stacking up
+  @@unique([familyId, ruleId, resolvedAt])
+  @@index([familyId, resolvedAt, dismissedAt])  // FIX: fast query for active undismissed insights
+  @@map("insight_snapshots")
+}
+
+enum InsightSeverity {
+  INFO
+  WARNING
+  CRITICAL
+}
+
+// ─── Tax (V2) ────────────────────────────────────────────────
+//
+// TaxProfile stores the jurisdiction and household context needed to run
+// tax insight rules. Uses income brackets deliberately — Weave never stores
+// exact salary figures. See ADR-10.
+//
+// One TaxProfile per family. Updated annually or when household situation changes.
+// taxYear tracks which year the profile reflects — rules change annually.
+
+model TaxProfile {
+  id                   String         @id @default(uuid())
+  familyId             String         @unique
+  jurisdiction         String         // ISO country code: 'DE', 'FR', 'NL' etc
+  taxYear              Int            // e.g. 2025
+  filingStatus         GermanTaxClass
+  householdIncomeBracket IncomeBracket
+  isMarried            Boolean        @default(false)
+  isSelfEmployed       Boolean        @default(false)
+  hasRentalIncome      Boolean        @default(false)
+  childrenCount        Int            @default(0)
+  // Store child DOBs for Kindergeld/Riester/Kinderfreibetrag calculations
+  // Riester: €300/child born after 2008, €185/child born before 2008
+  childrenDOB          DateTime[]
+  // Freistellungsauftrag: total Sparerpauschbetrag allocated across all banks
+  // €1,000/person, €2,000/couple — tracked to surface utilisation insights
+  freistellungsauftrag Decimal?       @db.Decimal(10, 2)
+  // YTD pension contributions — for Riester/Rürup allowance tracking
+  pensionContribYTD    Decimal?       @db.Decimal(10, 2)
+  // Property purchase date — for AfA depreciation and cost basis tracking
+  propertyPurchaseDate DateTime?
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
+
+  family              Family           @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  taxDeadlines        TaxDeadline[]
+
+  @@map("tax_profiles")
+}
+
+// Tax deadlines are surfaced as a virtual calendar layer in the UI.
+// They are pre-seeded per jurisdiction/year by a background job.
+// Families can dismiss individual deadlines once actioned.
+model TaxDeadline {
+  id           String    @id @default(uuid())
+  taxProfileId String
+  jurisdiction String    // 'DE'
+  taxYear      Int
+  deadlineKey  String    // e.g. 'de_steuererklaerung', 'de_riester_contribution'
+  title        String
+  description  String
+  dueDate      DateTime
+  sourceUrl    String    // always link to official source (ELSTER, Bundeszentralamt etc)
+  dismissedAt  DateTime?
+  createdAt    DateTime  @default(now())
+
+  taxProfile TaxProfile @relation(fields: [taxProfileId], references: [id], onDelete: Cascade)
+
+  @@unique([taxProfileId, deadlineKey, taxYear]) // one deadline entry per key per year
+  @@index([taxProfileId, dueDate])               // fast upcoming deadline queries
+  @@map("tax_deadlines")
+}
+
+enum GermanTaxClass {
+  KLASSE_I    // single
+  KLASSE_II   // single parent
+  KLASSE_III  // married, higher earner
+  KLASSE_IV   // married, similar income
+  KLASSE_V    // married, lower earner
+  KLASSE_VI   // second job
+}
+
+// Income brackets — deliberately coarse. Weave never stores exact salary.
+// Bracket-level accuracy is sufficient for rule-based tax insights.
+// See ADR-10: Privacy-by-Design in TaxProfile.
+enum IncomeBracket {
+  UNDER_30K
+  BETWEEN_30K_60K
+  BETWEEN_60K_100K
+  BETWEEN_100K_200K
+  OVER_200K
+}

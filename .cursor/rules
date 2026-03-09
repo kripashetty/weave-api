@@ -1,0 +1,80 @@
+# Weave API — Cursor Rules
+# These rules are enforced for all code generation and edits in this repository.
+# Source of truth: PRODUCT_BRIEF.md (Coding Conventions section) and ARCHITECTURE_DECISIONS.md.
+
+## Architecture
+
+- This is a **modular monolith** (ADR-01). Do not create cross-module repository calls.
+  Modules may only call each other through service interfaces — never directly access
+  another module's repository.
+- Every module has exactly five files: `routes.ts`, `service.ts`, `repository.ts`,
+  `schema.ts`, `test.ts`. Do not add files to a module without discussion.
+- All Prisma calls live in `*.repository.ts` files only. Never write Prisma queries
+  in services or route handlers.
+- Business logic lives in `*.service.ts` files only. Route handlers are thin —
+  they validate input, call the service, and return the response.
+
+## TypeScript
+
+- TypeScript **strict mode** is on. No `any` types. No `@ts-ignore`. Fix the type error.
+- All functions that can fail return `Result<T, AppError>` from `@shared/errors`.
+  Never throw exceptions across module boundaries.
+- Path aliases are configured: use `@modules/`, `@shared/`, `@config` — never
+  use relative `../../` imports across modules.
+
+## Database
+
+- The **Prisma schema is the source of truth**. Never alter the database directly.
+  All changes go through `prisma migrate dev`.
+- All monetary amounts use `Decimal` (ADR-08). Never use `number` or `float` for
+  money. Use `Decimal.js` methods for arithmetic. Serialise as strings in JSON responses.
+- Every Expense write must produce an `ExpenseEvent` in the **same Prisma transaction**.
+  The `ExpenseEvent` table is append-only — never update or delete rows in it.
+- All queries must be scoped to `familyId` (tenant isolation, ADR-07). The tenant
+  middleware sets `app.family_id` as a PostgreSQL session variable for RLS.
+
+## Validation
+
+- Every route must have a Zod schema for both request body and response body.
+  Schemas live in the module's `*.schema.ts` file.
+- All environment variables are validated at startup in `src/config.ts` using Zod.
+  The process exits if any required variable is missing or invalid.
+
+## Error Handling
+
+- Use the `AppError` class from `@shared/errors`. Map to HTTP status codes in route handlers.
+- Never swallow errors. Always log with context using `request.log.error({ err, context })`.
+- Return a consistent error shape from all routes: `{ error: { code, message } }`.
+
+## Auth & Security
+
+- Access tokens: RS256, 15-minute expiry. Refresh tokens: stored in Redis, 30-day expiry.
+- Stolen token detection: if a refresh token is used twice, call `invalidateAllFamilySessions`.
+- Passwords: bcrypt with cost factor 12. Never log passwords or raw tokens.
+- Google OAuth refresh tokens: AES-256-GCM encrypted using `APP_SECRET` before storing
+  in `User.googleRefreshTokenEnc`.
+
+## Background Jobs
+
+- All inter-module communication goes through SQS events via `@shared/events/publisher`.
+  Never call a job function directly from a route handler.
+- After any data write that could affect insights, publish the appropriate SQS event
+  (GOAL_UPDATED, EXPENSE_UPDATED, CALENDAR_SYNCED).
+
+## Comments
+
+- Do not add comments that narrate what the code does. Comments explain *why*, not *what*.
+- Reference ADR numbers when implementing decisions from `ARCHITECTURE_DECISIONS.md`.
+  Example: `// ADR-07: SET LOCAL enforces RLS at the DB layer`
+
+## Testing
+
+- Every module has a `*.test.ts` file. Test the service layer with mocked repositories.
+- Each insight rule has its own unit test. Rules must be independently testable.
+- Integration tests use Fastify's `app.inject()` — no real HTTP calls in tests.
+
+## Versioning
+
+- V1 features are in scope now. V2 features are scaffolded but not implemented —
+  do not add V2 business logic without a discussion and ADR.
+- The tax module (`src/modules/tax/`) is V2 scope. Scaffold only in V1.
