@@ -18,8 +18,8 @@
 // Insight trigger tests:
 //   - verify SQS event is published after createGoal, updateGoal, createCheckin
 
-import { describe, it } from 'vitest';
+import { describe } from 'vitest'
 
 describe('GoalsService', () => {
   // TODO: implement tests
-});
+})

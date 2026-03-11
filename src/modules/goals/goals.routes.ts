@@ -12,7 +12,7 @@
 // All routes require authentication. familyId injected via tenant middleware.
 // weekStart must be normalised to Monday 00:00:00 UTC in the service layer.
 
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance } from 'fastify'
 
 export async function goalsRoutes(_app: FastifyInstance): Promise<void> {
   // TODO: implement route registrations

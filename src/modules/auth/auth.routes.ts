@@ -11,7 +11,7 @@
 // Access token: 15-minute expiry, RS256. Refresh token: 30-day expiry, stored in Redis.
 // Stolen token detection: if a refresh token is used twice, invalidate all family sessions.
 
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance } from 'fastify'
 
 export async function authRoutes(_app: FastifyInstance): Promise<void> {
   // TODO: implement route registrations

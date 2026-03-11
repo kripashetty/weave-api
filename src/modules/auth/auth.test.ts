@@ -26,8 +26,8 @@
 //   POST /auth/refresh   — 200 on success, 401 on invalid token
 //   POST /auth/logout    — 204 on success
 
-import { describe, it } from 'vitest';
+import { describe } from 'vitest'
 
 describe('AuthService', () => {
   // TODO: implement tests
-});
+})

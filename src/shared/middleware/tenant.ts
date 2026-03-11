@@ -17,7 +17,7 @@
 // This middleware must run on every request that touches the database.
 // Order: authenticate → tenant → route handler.
 
-import type { FastifyReply, FastifyRequest } from 'fastify';
+import type { FastifyReply, FastifyRequest } from 'fastify'
 
 export async function injectTenant(
   _request: FastifyRequest,

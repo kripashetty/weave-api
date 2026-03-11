@@ -15,8 +15,8 @@
 //
 // Note: freistellungsauftrag and pensionContribYTD serialised as strings (Decimal safety).
 
-import { z } from 'zod';
+import { z } from 'zod'
 
 // TODO (V2): implement schema definitions
-export const CreateTaxProfileSchema = z.object({});
-export const UpdateTaxProfileSchema = z.object({});
+export const CreateTaxProfileSchema = z.object({})
+export const UpdateTaxProfileSchema = z.object({})

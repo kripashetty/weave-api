@@ -9,8 +9,8 @@
 //   ConnectAccountSchema     — { code } (OAuth callback code)
 //   DisconnectParamsSchema   — { id } (accountId path param)
 
-import { z } from 'zod';
+import { z } from 'zod'
 
 // TODO: implement schema definitions
-export const EventsQuerySchema = z.object({});
-export const ConnectAccountSchema = z.object({});
+export const EventsQuerySchema = z.object({})
+export const ConnectAccountSchema = z.object({})

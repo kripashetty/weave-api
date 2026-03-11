@@ -14,7 +14,7 @@
 //   subscription_renewals: { expenseIds: string[], totalAmount: string, earliestDueDate: string }
 //   budget_pressure:       { totalMonthly: string, limit: string, utilisationPercent: number }
 
-import { z } from 'zod';
+import { z } from 'zod'
 
 // TODO: implement schema definitions
-export const DismissParamsSchema = z.object({});
+export const DismissParamsSchema = z.object({})

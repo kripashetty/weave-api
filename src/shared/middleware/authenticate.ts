@@ -21,7 +21,7 @@
 // Token signing uses RS256 (asymmetric). Public key is loaded from config at startup.
 // Never log the full token — log only the sub claim if needed for debugging.
 
-import type { FastifyReply, FastifyRequest } from 'fastify';
+import type { FastifyReply, FastifyRequest } from 'fastify'
 
 export async function authenticate(
   _request: FastifyRequest,

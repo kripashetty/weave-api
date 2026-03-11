@@ -24,8 +24,8 @@
 // @@unique constraint test:
 //   - upsert does not create duplicate insights for same ruleId when condition persists
 
-import { describe, it } from 'vitest';
+import { describe } from 'vitest'
 
 describe('InsightRules', () => {
   // TODO: implement tests
-});
+})

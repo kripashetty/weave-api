@@ -14,9 +14,9 @@
 //
 // All schemas are used in both route validation and TypeScript type inference.
 
-import { z } from 'zod';
+import { z } from 'zod'
 
 // TODO: implement schema definitions
-export const RegisterRequestSchema = z.object({});
-export const LoginRequestSchema = z.object({});
-export const RefreshRequestSchema = z.object({});
+export const RegisterRequestSchema = z.object({})
+export const LoginRequestSchema = z.object({})
+export const RefreshRequestSchema = z.object({})

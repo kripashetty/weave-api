@@ -1,0 +1,81 @@
+version: "2"
+
+language: "en-US"
+
+tone_instructions: >
+  Be concise and direct. Focus on correctness, security, and architectural
+  consistency. Avoid restating what the code does — explain why a change
+  matters or what risk it introduces.
+
+reviews:
+  profile: assertive
+  request_changes_workflow: true
+  high_level_summary: true
+  poem: false
+  review_status: true
+  collapse_walkthrough: false
+
+  path_instructions:
+    - path: "src/modules/**/*.repository.ts"
+      instructions: >
+        Verify all queries are scoped to familyId (tenant isolation, ADR-07).
+        Prisma calls must stay inside repository files — flag any that leak into
+        services or route handlers. Check Decimal usage for monetary fields (ADR-08).
+
+    - path: "src/modules/**/*.service.ts"
+      instructions: >
+        Business logic only. No Prisma imports allowed. All fallible functions must
+        return Result<T, AppError> — never throw across module boundaries.
+        Check that cross-module calls go through service interfaces, not repositories.
+
+    - path: "src/modules/**/*.routes.ts"
+      instructions: >
+        Route handlers must be thin: validate input, call service, return response.
+        Every route must have a Zod schema for both request and response (schema.ts).
+        Map AppError codes to correct HTTP status codes. Error shape must be
+        { error: { code, message } }.
+
+    - path: "src/modules/**/*.schema.ts"
+      instructions: >
+        Ensure Zod schemas cover all request body fields and response body fields.
+        Monetary amounts must be serialised as strings in JSON responses (ADR-08).
+
+    - path: "src/modules/**/*.test.ts"
+      instructions: >
+        Tests must cover the service layer with mocked repositories.
+        Integration tests must use Fastify's app.inject() — no real HTTP calls.
+        Each insight rule must have its own independent unit test.
+
+    - path: "src/shared/**"
+      instructions: >
+        Shared utilities are used across all modules — flag any changes that
+        could break the AppError contract, Result type, or JWT/auth helpers.
+
+    - path: "src/config.ts"
+      instructions: >
+        All env vars must be validated with Zod. The process must exit on invalid
+        config. Do not add optional env vars without a sensible default or clear
+        documentation.
+
+    - path: "prisma/schema.prisma"
+      instructions: >
+        The Prisma schema is the source of truth (ADR). Check that monetary fields
+        use Decimal, every model has familyId for RLS scoping, and new models have
+        appropriate indices. Flag direct DB alterations or raw SQL that bypasses
+        Prisma migrations.
+
+    - path: "src/modules/tax/**"
+      instructions: >
+        The tax module is V2 scope — scaffold only. Flag any business logic
+        implementation that goes beyond scaffolding without an accompanying ADR.
+
+  abort_on_close: true
+
+  auto_review:
+    enabled: true
+    drafts: false
+    base_branches:
+      - main
+
+chat:
+  auto_reply: true

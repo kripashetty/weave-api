@@ -25,21 +25,21 @@
 // Health check endpoint: GET /health → { status: 'ok', version: pkg.version }
 // This endpoint is unauthenticated and used by the ECS health check.
 
-import Fastify from 'fastify';
+import Fastify from 'fastify'
 
 // TODO: implement full application bootstrap
 const app = Fastify({
   logger: true,
-});
+})
 
 const start = async (): Promise<void> => {
   try {
     // TODO: register plugins, routes, error handler
-    await app.listen({ port: 3001, host: '0.0.0.0' });
+    await app.listen({ port: 3001, host: '0.0.0.0' })
   } catch (err) {
-    app.log.error(err);
-    process.exit(1);
+    app.log.error(err)
+    process.exit(1)
   }
-};
+}
 
-void start();
+void start()

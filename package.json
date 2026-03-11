@@ -18,8 +18,12 @@
     "db:migrate:deploy": "prisma migrate deploy",
     "db:studio": "prisma studio",
     "db:reset": "prisma migrate reset",
-    "lint": "tsc --noEmit",
-    "typecheck": "tsc --noEmit"
+    "lint": "eslint src --ext .ts",
+    "lint:fix": "eslint src --ext .ts --fix",
+    "format": "prettier --write src",
+    "format:check": "prettier --check src",
+    "typecheck": "tsc --noEmit",
+    "prepare": "husky"
   },
   "dependencies": {
     "@aws-sdk/client-ses": "^3.750.0",
@@ -40,11 +44,25 @@
     "@types/bcrypt": "^5.0.2",
     "@types/jsonwebtoken": "^9.0.7",
     "@types/node": "^22.10.0",
+    "@typescript-eslint/eslint-plugin": "^8.57.0",
+    "@typescript-eslint/parser": "^8.57.0",
     "@vitest/coverage-v8": "^2.1.0",
+    "eslint": "^10.0.3",
+    "eslint-config-prettier": "^10.1.8",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.3.2",
+    "prettier": "^3.8.1",
     "prisma": "^6.4.0",
     "tsup": "^8.3.0",
     "tsx": "^4.19.0",
     "typescript": "^5.7.3",
+    "typescript-eslint": "^8.57.0",
     "vitest": "^2.1.0"
+  },
+  "lint-staged": {
+    "src/**/*.ts": [
+      "eslint --fix",
+      "prettier --write"
+    ]
   }
 }

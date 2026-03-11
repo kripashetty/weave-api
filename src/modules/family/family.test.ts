@@ -20,8 +20,8 @@
 //   PATCH /family         — 200 for ADMIN, 403 for MEMBER
 //   DELETE /family/members/:userId — 204 for ADMIN, 403 for MEMBER
 
-import { describe, it } from 'vitest';
+import { describe } from 'vitest'
 
 describe('FamilyService', () => {
   // TODO: implement tests
-});
+})

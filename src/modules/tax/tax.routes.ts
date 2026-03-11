@@ -12,7 +12,7 @@
 // All insights link to official sources and carry a disclaimer (see ADR-10).
 // This module is V2 scope — schema exists but routes are not implemented in V1.
 
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance } from 'fastify'
 
 export async function taxRoutes(_app: FastifyInstance): Promise<void> {
   // TODO (V2): implement route registrations

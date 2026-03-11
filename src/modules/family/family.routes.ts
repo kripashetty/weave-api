@@ -10,7 +10,7 @@
 // All routes inject familyId from JWT via the tenant middleware.
 // ADMIN-only routes must enforce role check.
 
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance } from 'fastify'
 
 export async function familyRoutes(_app: FastifyInstance): Promise<void> {
   // TODO: implement route registrations

@@ -21,8 +21,8 @@
 //   - seeds correct 2025 DE deadlines for a family with jurisdiction='DE'
 //   - is idempotent — running twice does not create duplicates
 
-import { describe, it } from 'vitest';
+import { describe } from 'vitest'
 
 describe('TaxService', () => {
   // TODO (V2): implement tests
-});
+})

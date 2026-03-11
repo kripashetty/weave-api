@@ -11,9 +11,9 @@
 // GoalCategory enum values: PERSONAL_GROWTH | KIDS_DEVELOPMENT | FAMILY | HEALTH | FINANCIAL | OTHER
 // CheckinStatus enum values: ON_TRACK | OFF_TRACK | BLOCKED | COMPLETED
 
-import { z } from 'zod';
+import { z } from 'zod'
 
 // TODO: implement schema definitions
-export const CreateGoalSchema = z.object({});
-export const UpdateGoalSchema = z.object({});
-export const CreateCheckinSchema = z.object({});
+export const CreateGoalSchema = z.object({})
+export const UpdateGoalSchema = z.object({})
+export const CreateCheckinSchema = z.object({})

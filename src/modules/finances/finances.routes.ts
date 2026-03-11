@@ -13,7 +13,7 @@
 // IMPORTANT: Every write to Expense must produce an ExpenseEvent in the same DB transaction.
 // Amounts use Decimal — never serialise as raw Decimal.js objects (use .toNumber() or .toString()).
 
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance } from 'fastify'
 
 export async function financesRoutes(_app: FastifyInstance): Promise<void> {
   // TODO: implement route registrations

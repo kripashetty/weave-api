@@ -21,8 +21,8 @@
 // SyncFailureCount behaviour:
 //   - after 3 consecutive failures, syncFailureCount > 3 (tested at service layer)
 
-import { describe, it } from 'vitest';
+import { describe } from 'vitest'
 
 describe('CalendarService', () => {
   // TODO: implement tests
-});
+})

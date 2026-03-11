@@ -15,7 +15,7 @@
 //   4. subscription_renewals   — subscriptions renewing in the next 14 days
 //   5. budget_pressure         — total active expenses exceed 90% of a configurable limit
 
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance } from 'fastify'
 
 export async function insightsRoutes(_app: FastifyInstance): Promise<void> {
   // TODO: implement route registrations

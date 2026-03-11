@@ -13,7 +13,7 @@
 // Calendar data is served from the local cache (calendar_events table) — ADR-03.
 // familyId is denormalised on CalendarEvent for fast family-scoped range queries.
 
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance } from 'fastify'
 
 export async function calendarRoutes(_app: FastifyInstance): Promise<void> {
   // TODO: implement route registrations

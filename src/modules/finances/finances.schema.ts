@@ -14,9 +14,9 @@
 //
 // NOTE: amount must be serialised as a string in responses — never as a float.
 
-import { z } from 'zod';
+import { z } from 'zod'
 
 // TODO: implement schema definitions
-export const CreateExpenseSchema = z.object({});
-export const UpdateExpenseSchema = z.object({});
-export const BulkImportSchema = z.object({});
+export const CreateExpenseSchema = z.object({})
+export const UpdateExpenseSchema = z.object({})
+export const BulkImportSchema = z.object({})

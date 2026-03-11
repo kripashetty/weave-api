@@ -6,8 +6,8 @@
 //   InviteMemberSchema       — { email, name }
 //   RemoveMemberParamsSchema — { userId }
 
-import { z } from 'zod';
+import { z } from 'zod'
 
 // TODO: implement schema definitions
-export const UpdateFamilySchema = z.object({});
-export const InviteMemberSchema = z.object({});
+export const UpdateFamilySchema = z.object({})
+export const InviteMemberSchema = z.object({})

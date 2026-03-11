@@ -23,8 +23,8 @@
 //   - arithmetic on amounts uses Decimal.js — no floating point rounding errors
 //   - £9.99 * 12 = £119.88 exactly
 
-import { describe, it } from 'vitest';
+import { describe } from 'vitest'
 
 describe('FinancesService', () => {
   // TODO: implement tests
-});
+})
