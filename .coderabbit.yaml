@@ -1,0 +1,49 @@
+language: en-US
+reviews:
+  auto_review:
+    enabled: true
+    drafts: false
+  review_status: true
+  poem: false
+  path_instructions:
+    - path: "app/modules/**/router.py"
+      instructions: |
+        Check that router handlers contain no business logic.
+        Verify family_id is never accepted from the request body.
+        Verify all routes use Pydantic schema validation.
+        Check all routes use Depends() for session and current user injection.
+
+    - path: "app/modules/**/service.py"
+      instructions: |
+        Check that business logic does not call SQLAlchemy directly.
+        Verify all functions return Result[T, AppError] types.
+        Check no exceptions are raised across module boundaries.
+        Verify async def is used for all functions touching DB or external APIs.
+
+    - path: "app/modules/**/repository.py"
+      instructions: |
+        Check all queries filter by family_id.
+        Verify no business logic is present.
+        Check transactions are used for multi-table writes.
+        Verify only async SQLAlchemy session methods are used.
+
+    - path: "app/models/**/*.py"
+      instructions: |
+        Verify all models use Mapped[] and mapped_column() syntax (SQLAlchemy 2.0).
+        Check all monetary fields use Numeric(12, 2) not Float.
+        Check all ID fields use UUID type.
+        Verify all models have family_id for tenant isolation.
+        Check expense_events has no update or delete operations.
+
+    - path: "alembic/versions/*.py"
+      instructions: |
+        Check that RLS policies are included for any new tables.
+        Verify indexes exist on all family_id fields.
+        Check that monetary columns use NUMERIC not FLOAT.
+        Verify the migration is reversible (downgrade function is implemented).
+
+    - path: "tests/**/*.py"
+      instructions: |
+        Check that tests mock the SQLAlchemy session — never hit a real database in unit tests.
+        Verify unhappy paths are tested — wrong family_id, missing auth, invalid input.
+        Check pytest-asyncio is used for all async tests.

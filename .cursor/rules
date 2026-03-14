@@ -1,0 +1,84 @@
+# Weave API — Cursor Rules
+
+## Project Context
+This is the FastAPI backend for Weave — a family life operating system.
+Always read docs/PRODUCT_BRIEF.md before making any changes.
+Every decision in that document is final — do not suggest alternative stacks.
+
+## Stack
+- Language: Python 3.12
+- Framework: FastAPI (async throughout)
+- ORM: SQLAlchemy 2.0 async with asyncpg driver
+- Migrations: Alembic
+- Validation: Pydantic v2
+- Auth: python-jose (RS256 JWT) + passlib bcrypt
+- Queue: boto3 / aiobotocore (AWS SQS)
+- Cache: aioredis
+- Linting: Ruff
+- Type checking: mypy strict mode
+- Testing: pytest + pytest-asyncio
+
+## Architecture Rules
+- Every module has exactly: router.py, service.py, repository.py, schemas.py, test_[module].py
+- Router handlers contain no business logic — validate input, call service, return response
+- Business logic lives in the service layer only
+- Database queries live in the repository layer only — never call SQLAlchemy directly from services
+- All cross-module calls go through the service interface, never another module's repository
+
+## Python Rules
+- Python 3.12+ syntax throughout — use `type X = Y` for type aliases, `X | Y` for unions
+- All functions must have explicit return type annotations
+- No `Any` types — mypy strict mode is always on
+- Use `Result[T, E]` return types for all service functions — never raise across module boundaries
+- All environment variables validated via Pydantic Settings on startup in app/config.py
+- Use `async def` for all functions that touch the database, cache, or external APIs
+
+## API Design Rules
+- All routes have Pydantic schemas for both request body and response
+- All routes require authentication except POST /auth/signup and POST /auth/login
+- family_id always comes from the JWT — never accept it from the request body
+- API responses: { "data": T } for success, { "error": { "code": str, "message": str } } for errors
+- Use FastAPI's Depends() for session injection, current user, and tenant context
+
+## Database Rules
+- Never use SQLAlchemy synchronous session — always async
+- Always filter by family_id on every query — never return cross-family data
+- Use transactions (async with session.begin()) for multi-table writes
+- expense_events table is append-only — never UPDATE or DELETE rows
+- All migrations go through Alembic — never modify the database directly
+- RLS policies are written as raw SQL in Alembic migrations
+
+## Error Handling
+- Define all error types in app/shared/errors/__init__.py
+- Never swallow errors silently — always log with context
+- Service layer returns Result[T, AppError] — never raises
+- Router layer calls result.error.to_http_exception() and raises it
+- HTTP status codes: 400 validation, 401 unauthenticated, 403 forbidden,
+  404 not found, 409 conflict, 500 internal
+
+## Testing Rules
+- Every module has a test file: tests/modules/test_[module].py
+- Test the service layer with mocked repositories
+- Test routes with FastAPI's TestClient or httpx AsyncClient
+- Always test unhappy paths — missing auth, wrong family, invalid input
+- Use pytest-asyncio for all async tests
+- Mock SQLAlchemy sessions and external services — never hit real database in unit tests
+
+## Naming Conventions
+- Files: snake_case (goal_service.py, calendar_repository.py)
+- Classes: PascalCase (GoalService, CalendarRepository)
+- Functions and variables: snake_case
+- Database models: PascalCase (Goal, CalendarAccount)
+- Pydantic schemas: PascalCase with suffix (GoalResponse, CreateGoalRequest)
+- Environment variables: SCREAMING_SNAKE_CASE
+- Constants: SCREAMING_SNAKE_CASE
+
+## What To Never Do
+- Never put business logic in a router
+- Never call SQLAlchemy outside of a repository file
+- Never accept family_id from request input — always read from JWT
+- Never use float for monetary values — always Decimal
+- Never use Any type
+- Never raise exceptions across module boundaries — use Result types
+- Never hardcode secrets or configuration values
+- Never use synchronous SQLAlchemy in an async context
