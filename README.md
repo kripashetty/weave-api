@@ -17,3 +17,4 @@ make help          # list all available commands
 ## Tech Stack
 FastAPI, SQLAlchemy 2.0 async, Alembic, Pydantic v2, asyncpg,
 PostgreSQL, Redis (aioredis), AWS SQS + SES, python-jose RS256
+
